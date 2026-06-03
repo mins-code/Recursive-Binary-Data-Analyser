@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RBDA — Recursive Binary Data Analyser</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d0f14;
+      --surface:  #151820;
+      --border:   #1e2330;
+      --accent:   #3b82f6;
+      --accent2:  #06b6d4;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --success:  #22c55e;
+      --error:    #ef4444;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 24px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    header .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      border: 1px solid var(--accent2);
+      border-radius: 20px;
+      padding: 3px 12px;
+      margin-bottom: 14px;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header p {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    /* ── Card shell ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      width: 100%;
+      max-width: 680px;
+    }
+
+    /* ── Upload zone ── */
+    #drop-zone {
+      padding: 40px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      border-radius: 14px;
+      transition: background .15s, border-color .15s;
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      background: rgba(59,130,246,.06);
+      border-color: var(--accent);
+    }
+    #drop-zone .icon {
+      width: 52px; height: 52px;
+      border-radius: 12px;
+      background: rgba(59,130,246,.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    #drop-zone h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    #drop-zone p {
+      font-size: .82rem;
+      color: var(--muted);
+    }
+    #drop-zone .file-name {
+      font-size: .82rem;
+      color: var(--accent2);
+      font-weight: 500;
+      max-width: 340px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #file-input { display: none; }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0;
+    }
+
+    /* ── Footer of upload card ── */
+    .card-footer {
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* ── Button ── */
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      font-size: .875rem;
+      font-weight: 600;
+      padding: 9px 20px;
+      transition: opacity .15s, transform .08s;
+    }
+    button:active { transform: scale(.97); }
+    button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+    #btn-upload {
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      flex: 1;
+    }
+    #btn-analyze {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      flex: 1;
+    }
+    #btn-clear {
+      background: var(--border);
+      color: var(--muted);
+    }
+
+    /* ── Status line ── */
+    #status {
+      font-size: .8rem;
+      color: var(--muted);
+      flex: 1;
+    }
+    #status.running { color: var(--accent2); }
+    #status.ok      { color: var(--success); }
+    #status.err     { color: var(--error); }
+
+    /* ── Stat grid ── */
+    #results-section { display: none; margin-top: 20px; width: 100%; max-width: 680px; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    @media (max-width: 520px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .stat-card .label {
+      font-size: .7rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .stat-card .value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .stat-card .value.accent  { color: var(--accent); }
+    .stat-card .value.accent2 { color: var(--accent2); }
+    .stat-card .value.green   { color: var(--success); }
+
+    /* ── JSON block ── */
+    .json-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .json-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .json-header span {
+      font-size: .75rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .json-header button {
+      background: var(--border);
+      color: var(--muted);
+      font-size: .72rem;
+      padding: 4px 10px;
+    }
+    pre#json-output {
+      padding: 18px;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: .8rem;
+      line-height: 1.6;
+      color: var(--text);
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    /* JSON syntax colours */
+    .jk { color: #93c5fd; }   /* key */
+    .jn { color: #fb923c; }   /* number */
+    .js { color: #86efac; }   /* string */
+
+    /* ── Spinner ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid var(--accent2);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="badge">Bitcoin Block Parser</div>
+    <h1>Recursive Binary Data Analyser</h1>
+    <p>Upload a Bitcoin <code style="color:var(--accent2);background:rgba(6,182,212,.1);padding:1px 6px;border-radius:4px;font-size:.8rem">.dat</code> block file and run the recursive parser</p>
+  </header>
+
+  <!-- Upload card -->
+  <div class="card">
+    <div id="drop-zone" role="button" tabindex="0" aria-label="Upload file">
+      <div class="icon">📦</div>
+      <h2>Drop a .dat file here</h2>
+      <p>or click to browse your files</p>
+      <span class="file-name" id="file-label" style="display:none"></span>
+    </div>
+    <input type="file" id="file-input" accept=".dat" />
+
+    <div class="divider"></div>
+
+    <div class="card-footer">
+      <span id="status">No file selected</span>
+      <button id="btn-clear" onclick="clearAll()" style="display:none">Clear</button>
+      <button id="btn-upload"  disabled onclick="uploadFile()"  style="display:none">Upload</button>
+      <button id="btn-analyze" disabled onclick="runAnalysis()" style="display:none">Analyse</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results-section">
+    <div class="stats-grid" id="stats-grid"></div>
+
+    <div class="json-card">
+      <div class="json-header">
+        <span>Raw JSON output</span>
+        <button onclick="copyJson()">Copy</button>
+      </div>
+      <pre id="json-output"></pre>
+    </div>
+  </div>
+
+  <script>
+    const dropZone   = document.getElementById('drop-zone');
+    const fileInput  = document.getElementById('file-input');
+    const fileLabel  = document.getElementById('file-label');
+    const btnUpload  = document.getElementById('btn-upload');
+    const btnAnalyze = document.getElementById('btn-analyze');
+    const btnClear   = document.getElementById('btn-clear');
+    const status     = document.getElementById('status');
+
+    let selectedFile = null;
+    let uploadedPath = null;
+    let lastJson     = null;
+
+    // ── Drag-drop ──────────────────────────────────────────
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', ()=> dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const f = e.dataTransfer.files[0];
+      if (f) handleFile(f);
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+
+    // Step 1: file picked — show Upload button
+    function handleFile(file) {
+      selectedFile = file;
+      uploadedPath = null;
+      fileLabel.textContent = file.name;
+      fileLabel.style.display = 'block';
+      btnClear.style.display = 'inline-block';
+      btnUpload.style.display = 'inline-block';
+      btnUpload.disabled = false;
+      btnAnalyze.style.display = 'none';
+      btnAnalyze.disabled = true;
+      document.getElementById('results-section').style.display = 'none';
+      setStatus('', file.name + ' ready — click Upload');
+    }
+
+    // Step 2: upload the file
+    async function uploadFile() {
+      if (!selectedFile) return;
+      btnUpload.disabled = true;
+      setStatus('running', '<span class="spinner"></span>Uploading…');
+      try {
+        const fd = new FormData();
+        fd.append('file', selectedFile);
+        const res = await fetch('/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        uploadedPath = data.filePath;
+        btnUpload.style.display = 'none';
+        btnAnalyze.style.display = 'inline-block';
+        btnAnalyze.disabled = false;
+        setStatus('ok', 'Uploaded — click Analyse to run the parser');
+      } catch (err) {
+        setStatus('err', '⚠ ' + err.message);
+        btnUpload.disabled = false;
+      }
+    }
+
+    // Step 3: run the analysis
+    async function runAnalysis() {
+      if (!uploadedPath) return;
+      btnAnalyze.disabled = true;
+      setStatus('running', '<span class="spinner"></span>Running recursive parser…');
+      try {
+        const res = await fetch('/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filePath: uploadedPath })
+        });
+        const stats = await res.json();
+        if (!res.ok) throw new Error(stats.error || 'Analysis failed');
+        lastJson = stats;
+        renderResults(stats);
+        setStatus('ok', 'Done — ' + selectedFile.name);
+      } catch (err) {
+        setStatus('err', '⚠ ' + err.message);
+      } finally {
+        btnAnalyze.disabled = false;
+      }
+    }
+
+    // ── Render ─────────────────────────────────────────────
+    const STAT_META = [
+      { key: 'total_blocks',       label: 'Blocks',       cls: 'accent',  fmt: fmtNum },
+      { key: 'total_transactions', label: 'Transactions', cls: 'accent2', fmt: fmtNum },
+      { key: 'total_inputs',       label: 'Inputs',       cls: '',        fmt: fmtNum },
+      { key: 'total_outputs',      label: 'Outputs',      cls: '',        fmt: fmtNum },
+      { key: 'total_scripts',      label: 'Scripts',      cls: '',        fmt: fmtNum },
+      { key: 'total_bytes',        label: 'Bytes Parsed', cls: 'accent2', fmt: fmtBytes },
+      { key: 'max_depth',          label: 'Max Depth',    cls: 'accent',  fmt: v => `${v}` },
+      { key: 'elapsed_ms',         label: 'Elapsed',      cls: 'green',   fmt: v => `${v} ms` },
+    ];
+
+    function renderResults(stats) {
+      const grid = document.getElementById('stats-grid');
+      grid.innerHTML = '';
+
+      STAT_META.forEach(({ key, label, cls, fmt }) => {
+        const val = stats[key] ?? '—';
+        const el = document.createElement('div');
+        el.className = 'stat-card';
+        el.innerHTML = `<span class="label">${label}</span><span class="value ${cls}">${fmt(val)}</span>`;
+        grid.appendChild(el);
+      });
+
+      // Extra unknown keys
+      const known = new Set(STAT_META.map(m => m.key));
+      Object.entries(stats).forEach(([k, v]) => {
+        if (!known.has(k)) {
+          const el = document.createElement('div');
+          el.className = 'stat-card';
+          el.innerHTML = `<span class="label">${k}</span><span class="value">${v}</span>`;
+          grid.appendChild(el);
+        }
+      });
+
+      document.getElementById('json-output').innerHTML = syntaxHighlight(stats);
+      document.getElementById('results-section').style.display = 'block';
+    }
+
+    // ── Formatters ─────────────────────────────────────────
+    function fmtNum(n) {
+      return typeof n === 'number' ? n.toLocaleString() : n;
+    }
+    function fmtBytes(n) {
+      if (typeof n !== 'number') return n;
+      if (n >= 1_073_741_824) return (n / 1_073_741_824).toFixed(2) + ' GB';
+      if (n >= 1_048_576)     return (n / 1_048_576).toFixed(2) + ' MB';
+      if (n >= 1_024)         return (n / 1_024).toFixed(1) + ' KB';
+      return n + ' B';
+    }
+
+    function syntaxHighlight(obj) {
+      const raw = JSON.stringify(obj, null, 2);
+      return raw.replace(
+        /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+        match => {
+          if (/^"/.test(match)) {
+            return /:$/.test(match)
+              ? `<span class="jk">${match}</span>`
+              : `<span class="js">${match}</span>`;
+          }
+          return `<span class="jn">${match}</span>`;
+        }
+      );
+    }
+
+    // ── Helpers ────────────────────────────────────────────
+    function setStatus(type, html) {
+      status.className = type;
+      status.innerHTML = html;
+    }
+
+    function clearAll() {
+      selectedFile = null;
+      uploadedPath = null;
+      lastJson = null;
+      btnClear.style.display = 'none';
+      btnUpload.style.display = 'none';
+      btnUpload.disabled = true;
+      btnAnalyze.style.display = 'none';
+      btnAnalyze.disabled = true;
+      fileLabel.style.display = 'none';
+      fileLabel.textContent = '';
+      fileInput.value = '';
+      document.getElementById('results-section').style.display = 'none';
+      status.className = '';
+      status.innerHTML = 'No file selected';
+    }
+
+    function copyJson() {
+      if (!lastJson) return;
+      navigator.clipboard.writeText(JSON.stringify(lastJson, null, 2))
+        .then(() => {
+          const btn = event.target;
+          btn.textContent = 'Copied!';
+          setTimeout(() => btn.textContent = 'Copy', 1500);
+        });
+    }
+  </script>
+</body>
+</html>

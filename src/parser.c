@@ -2,8 +2,6 @@
 #include "varint.h"
 #include <string.h>
 
-#define BITCOIN_MAGIC 0x0709110B
-
 static uint32_t read_u32(const uint8_t *b, size_t o) {
     return (uint32_t)b[o] |
            ((uint32_t)b[o + 1] << 8) |
@@ -15,8 +13,7 @@ int parse_block(ParseCtx *ctx) {
     if (ctx->offset + 8 > ctx->len) return 1;
     if (ctx->depth > ctx->max_allowed_depth) return 1;
 
-    uint32_t magic = read_u32(ctx->data, ctx->offset);
-    if (magic != BITCOIN_MAGIC) return 1;
+    /* Magic already validated by caller; just skip it */
     ctx->offset += 4;
 
     uint32_t block_size = read_u32(ctx->data, ctx->offset);

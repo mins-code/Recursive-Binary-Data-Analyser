@@ -23,12 +23,6 @@ int main(int argc, char *argv[]) {
     fread(buf, 1, fsize, f);
     fclose(f);
 
-    /* --- XOR De-Obfuscation Step for Bitcoin Core v28+ --- */
-    uint8_t xor_key[8] = {0x86, 0xED, 0xB9, 0xE0, 0x9F, 0x3C, 0xFB, 0xF3};
-    for (long i = 0; i < fsize; i++) {
-        buf[i] ^= xor_key[i % 8];
-    }
-    /* ----------------------------------------------------- */
 
     Stats stats = {0};
     ParseCtx ctx = {

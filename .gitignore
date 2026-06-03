@@ -1,0 +1,31 @@
+# Compiled binaries
+rbda.exe
+scanner.exe
+*.o
+*.out
+
+# Build artifacts
+build/
+bin/
+
+# Dashboard dependencies and runtime
+dashboard/node_modules/
+dashboard/uploads/
+
+# Data files (large binary blobs)
+data/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
