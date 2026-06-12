@@ -33,10 +33,10 @@ int main(int argc, char *argv[]) {
 
     for (long i = 0; i <= fsize - 4; i++) {
         uint32_t magic = (uint32_t)buf[i] | 
-                         ((uint32_t)buf[i+1] << 8) |
-                         ((uint32_t)buf[i+2] << 16) | 
-                         ((uint32_t)buf[i+3] << 24);
-                         
+                        ((uint32_t)buf[i+1] << 8) |
+                        ((uint32_t)buf[i+2] << 16) | 
+                        ((uint32_t)buf[i+3] << 24);
+                        
         /* Check for Testnet3 (0x0709110B) or Testnet4 (0x1C163F28) */
         if (magic == 0x0709110B || magic == 0x1C163F28) {
             printf("SUCCESS: Found Magic Number 0x%08X at byte offset: %ld\n", magic, i);

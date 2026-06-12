@@ -4,9 +4,9 @@
 
 static uint32_t read_u32(const uint8_t *b, size_t o) {
     return (uint32_t)b[o] |
-           ((uint32_t)b[o + 1] << 8) |
-           ((uint32_t)b[o + 2] << 16) |
-           ((uint32_t)b[o + 3] << 24);
+            ((uint32_t)b[o + 1] << 8) |
+            ((uint32_t)b[o + 2] << 16) |
+            ((uint32_t)b[o + 3] << 24);
 }
 
 int parse_block(ParseCtx *ctx) {

@@ -246,6 +246,136 @@
     .jn { color: #fb923c; }   /* number */
     .js { color: #86efac; }   /* string */
 
+    /* ── Listen card ── */
+    .listen-card {
+      margin-top: 16px;
+    }
+    .listen-header {
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .listen-title {
+      font-size: .95rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .listen-sub {
+      font-size: .78rem;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+    .listen-sub code {
+      color: var(--accent2);
+      background: rgba(6,182,212,.1);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    #btn-listen {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      white-space: nowrap;
+    }
+    #btn-listen.active {
+      background: var(--border);
+      color: var(--error);
+      border: 1px solid var(--error);
+    }
+
+    /* pulse dot shown when listening */
+    .pulse-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      margin-right: 7px;
+      vertical-align: middle;
+      animation: pulse 1.4s ease infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: .45; transform: scale(.75); }
+    }
+
+    /* ── Live feed ── */
+    #feed-list {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+
+    .feed-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .feed-item-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .feed-item-header .fname {
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--accent2);
+    }
+    .feed-item-header .ftime {
+      font-size: .72rem;
+      color: var(--muted);
+    }
+    .feed-item-header .fevent {
+      font-size: .68rem;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+    }
+    .feed-mini-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .feed-mini-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 8px 10px;
+    }
+    .feed-mini-card .label {
+      font-size: .65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--muted);
+    }
+    .feed-mini-card .value {
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-top: 2px;
+    }
+    .feed-error {
+      font-size: .8rem;
+      color: var(--error);
+    }
+    #feed-empty {
+      text-align: center;
+      padding: 24px;
+      font-size: .82rem;
+      color: var(--muted);
+    }
+
     /* ── Spinner ── */
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner {
@@ -285,6 +415,23 @@
       <button id="btn-clear" onclick="clearAll()" style="display:none">Clear</button>
       <button id="btn-upload"  disabled onclick="uploadFile()"  style="display:none">Upload</button>
       <button id="btn-analyze" disabled onclick="runAnalysis()" style="display:none">Analyse</button>
+    </div>
+  </div>
+
+  <!-- Listen card -->
+  <div class="card listen-card" style="max-width:680px;width:100%">
+    <div class="listen-header">
+      <div>
+        <div class="listen-title">Live Block Listener</div>
+        <div class="listen-sub">Watches <code>data/</code> for new or changed <code>.dat</code> files and auto-analyses them</div>
+      </div>
+      <button id="btn-listen" onclick="toggleListen()">Listen to Blockchain</button>
+    </div>
+    <div id="listen-feed" style="display:none">
+      <div class="divider"></div>
+      <div id="feed-list">
+        <div id="feed-empty">Waiting for the next Bitcoin block (~10 min avg)…</div>
+      </div>
     </div>
   </div>
 
@@ -478,6 +625,121 @@
       document.getElementById('results-section').style.display = 'none';
       status.className = '';
       status.innerHTML = 'No file selected';
+    }
+
+    // ── Live Blockchain Listener (blockstream.info API) ────
+    let eventSource = null;
+    let listening = false;
+
+    async function toggleListen() {
+      listening ? await stopListening() : await startListening();
+    }
+
+    async function startListening() {
+      const btn = document.getElementById('btn-listen');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/chain/start', { method: 'POST' });
+        if (!res.ok) throw new Error('Failed to start listener');
+
+        eventSource = new EventSource('/chain/stream');
+        eventSource.onmessage = e => handleFeedEvent(JSON.parse(e.data));
+        eventSource.onerror   = () => { if (listening) stopListening(); };
+
+        listening = true;
+        btn.innerHTML = '<span class="pulse-dot"></span>Stop Listening';
+        btn.classList.add('active');
+        document.getElementById('listen-feed').style.display = 'block';
+      } catch (err) {
+        appendFeedError(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function stopListening() {
+      await fetch('/chain/stop', { method: 'POST' }).catch(() => {});
+      if (eventSource) { eventSource.close(); eventSource = null; }
+      listening = false;
+      const btn = document.getElementById('btn-listen');
+      btn.innerHTML = 'Listen to Blockchain';
+      btn.classList.remove('active');
+    }
+
+    function handleFeedEvent(payload) {
+      if (payload.event === 'stopped')           { stopListening(); return; }
+      if (payload.event === 'poll_error')         { appendFeedError(payload.error); return; }
+      if (payload.event === 'new_block_detected') { appendFeedFetching(payload); return; }
+      if (payload.event === 'block_analysed') {
+        // Remove the "fetching..." placeholder for this hash
+        const placeholder = document.querySelector(`[data-hash="${payload.hash}"]`);
+        if (placeholder) placeholder.remove();
+        payload.ok
+          ? appendFeedItem(payload)
+          : appendFeedError(`Block ${payload.hash.slice(0, 10)}…: ${payload.error}`);
+      }
+    }
+
+    const FEED_STATS = [
+      { key: 'total_blocks',       label: 'Blocks' },
+      { key: 'total_transactions', label: 'Txns' },
+      { key: 'total_inputs',       label: 'Inputs' },
+      { key: 'total_outputs',      label: 'Outputs' },
+      { key: 'total_scripts',      label: 'Scripts' },
+      { key: 'total_bytes',        label: 'Bytes',  fmt: fmtBytes },
+      { key: 'max_depth',          label: 'Depth' },
+      { key: 'elapsed_ms',         label: 'ms' },
+    ];
+
+    function clearFeedEmpty() {
+      const el = document.getElementById('feed-empty');
+      if (el) el.remove();
+    }
+
+    function appendFeedFetching(payload) {
+      clearFeedEmpty();
+      const item = document.createElement('div');
+      item.className = 'feed-item';
+      item.dataset.hash = payload.hash;
+      item.innerHTML = `<div style="display:flex;align-items:center;gap:10px;font-size:.82rem;color:var(--muted)">
+        <span class="spinner"></span>
+        New block${payload.height ? ` <strong style="color:var(--text)">#${payload.height.toLocaleString()}</strong>` : ''} detected — fetching raw bytes &amp; analysing…
+        <span style="color:var(--accent2);font-family:monospace;font-size:.72rem;margin-left:auto">${payload.hash.slice(0, 16)}…</span>
+      </div>`;
+      document.getElementById('feed-list').prepend(item);
+    }
+
+    function appendFeedItem(payload) {
+      clearFeedEmpty();
+      const now = new Date().toLocaleTimeString();
+
+      const miniCards = FEED_STATS.map(({ key, label, fmt }) => {
+        const v = payload.stats[key] ?? '—';
+        return `<div class="feed-mini-card">
+          <div class="label">${label}</div>
+          <div class="value">${fmt ? fmt(v) : fmtNum(v)}</div>
+        </div>`;
+      }).join('');
+
+      const item = document.createElement('div');
+      item.className = 'feed-item';
+      item.innerHTML = `
+        <div class="feed-item-header">
+          <span class="fname">${payload.height ? `Block #${payload.height.toLocaleString()}` : 'New Block'}</span>
+          <span class="fevent">mainnet</span>
+          <span class="ftime">${now}</span>
+        </div>
+        <div style="font-family:monospace;font-size:.7rem;color:var(--muted);margin-bottom:10px;word-break:break-all">${payload.hash}</div>
+        <div class="feed-mini-grid">${miniCards}</div>`;
+      document.getElementById('feed-list').prepend(item);
+    }
+
+    function appendFeedError(msg) {
+      clearFeedEmpty();
+      const item = document.createElement('div');
+      item.className = 'feed-item';
+      item.innerHTML = `<div class="feed-error">⚠ ${msg}</div>`;
+      document.getElementById('feed-list').prepend(item);
     }
 
     function copyJson() {

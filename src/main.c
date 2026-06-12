@@ -36,13 +36,12 @@ int main(int argc, char *argv[]) {
 
     clock_t t0 = clock();
 
-    /* Bulletproof Gap-Skip Loop */
     while (ctx.offset + 4 <= ctx.len) {
         uint32_t magic = (uint32_t)ctx.data[ctx.offset] | 
-                         ((uint32_t)ctx.data[ctx.offset+1] << 8) | 
-                         ((uint32_t)ctx.data[ctx.offset+2] << 16) | 
-                         ((uint32_t)ctx.data[ctx.offset+3] << 24);
-                         
+                        ((uint32_t)ctx.data[ctx.offset+1] << 8) | 
+                        ((uint32_t)ctx.data[ctx.offset+2] << 16) | 
+                        ((uint32_t)ctx.data[ctx.offset+3] << 24);
+                        
         /* Support Mainnet, Testnet3, Testnet4, Regtest, and Signet */
         if (magic == 0xD9B4BEF9 || magic == 0x0709110B || magic == 0x1C163F28 || magic == 0xDAB5BFFA || magic == 0x40CF030A) {
             size_t saved_offset = ctx.offset;
